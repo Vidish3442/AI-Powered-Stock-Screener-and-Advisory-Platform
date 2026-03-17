@@ -1,4 +1,4 @@
-# 📊 AI Stock Screener - Intelligent Stock Analysis Platform
+#📊 AI Stock Screener - Intelligent Stock Analysis Platform
 
 An advanced stock screening platform powered by AI that enables users to analyze stocks using natural language queries, manage portfolios, and set up intelligent price alerts with real-time notifications.
 
@@ -707,5 +707,4 @@ python ingest_fundamentals.py
 **Built with ❤️ by the AI Stock Screener Team**
 
 *Making stock analysis accessible to everyone through the power of AI*
-#   A I - P o w e r e d - S t o c k - S c r e e n e r - a n d - A d v i s o r y - P l a t f o r m  
- 
+#
