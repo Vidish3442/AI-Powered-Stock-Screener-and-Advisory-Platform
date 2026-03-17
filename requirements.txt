@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+mysql-connector-python
+python-dotenv
+google-generativeai
+pydantic
+streamlit
+requests
+python-multipart
+PyJWT
+yfinance
+pandas
+openai
+redis
+hiredis
