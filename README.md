@@ -1,4 +1,4 @@
-#📊 AI Stock Screener - Intelligent Stock Analysis Platform
+# 📊 AI Stock Screener - Intelligent Stock Analysis Platform
 
 An advanced stock screening platform powered by AI that enables users to analyze stocks using natural language queries, manage portfolios, and set up intelligent price alerts with real-time notifications.
 
