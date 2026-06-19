@@ -350,7 +350,7 @@ else:
                         
                         
                         if 'Upside Type' in df_display.columns:
-                            styled_df = df_display.style.applymap(style_upside_category, subset=['Upside Type'])
+                            styled_df = df_display.style.map(style_upside_category, subset=['Upside Type'])
                             st.dataframe(styled_df )
                         else:
                             st.dataframe(df_display )
