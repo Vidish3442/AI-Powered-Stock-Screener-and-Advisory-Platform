@@ -33,15 +33,15 @@ class RedisCache:
             )
             self.client.ping()
             self.enabled = True
-            print(f"✅ Redis cache enabled at {self.redis_host}:{self.redis_port}")
+            print(f"[cache] Redis enabled at {self.redis_host}:{self.redis_port}")
         except redis.ConnectionError:
-            print(f"⚠️ Redis not available at {self.redis_host}:{self.redis_port}")
-            print("📊 Application will run without caching (direct database queries)")
+            print(f"[cache] Redis not available at {self.redis_host}:{self.redis_port}")
+            print("[cache] Running without caching (direct database queries)")
             self.client = None
             self.enabled = False
         except Exception as e:
-            print(f"⚠️ Redis initialization error: {e}")
-            print("📊 Application will run without caching (direct database queries)")
+            print(f"[cache] Redis initialization error: {e}")
+            print("[cache] Running without caching (direct database queries)")
             self.client = None
             self.enabled = False
     
@@ -54,7 +54,7 @@ class RedisCache:
             return True
         except:
             self.enabled = False
-            print("⚠️ Redis connection lost. Falling back to direct database queries.")
+            print("[cache] Redis connection lost. Falling back to direct database queries.")
             return False
     
     def get(self, key: str) -> Optional[Any]:
@@ -69,13 +69,13 @@ class RedisCache:
             return None
         except redis.RedisError:
             self.enabled = False
-            print("⚠️ Redis error during get. Falling back to database.")
+            print("[cache] Redis error during get. Falling back to database.")
             return None
         except json.JSONDecodeError:
             self.delete(key)
             return None
         except Exception as e:
-            print(f"⚠️ Cache get error: {e}")
+            print(f"[cache] Get error: {e}")
             return None
     
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
@@ -90,16 +90,16 @@ class RedisCache:
             return True
         except redis.RedisError as e:
             self.enabled = False
-            print(f"⚠️ Redis error during set: {e}. Continuing without cache.")
+            print(f"[cache] Redis error during set: {e}. Continuing without cache.")
             return False
         except (TypeError, ValueError) as e:
             # Serialization error
-            print(f"⚠️ Cannot serialize value for caching: {e}")
+            print(f"[cache] Cannot serialize value: {e}")
             print(f"   Key: {key}")
             print(f"   Value type: {type(value)}")
             return False
         except Exception as e:
-            print(f"⚠️ Cache set error: {e}")
+            print(f"[cache] Set error: {e}")
             return False
     
     def delete(self, key: str) -> bool:
@@ -114,7 +114,7 @@ class RedisCache:
             self.enabled = False
             return False
         except Exception as e:
-            print(f"⚠️ Cache delete error: {e}")
+            print(f"[cache] Delete error: {e}")
             return False
     
     def delete_pattern(self, pattern: str) -> int:
@@ -131,7 +131,7 @@ class RedisCache:
             self.enabled = False
             return 0
         except Exception as e:
-            print(f"⚠️ Cache delete pattern error: {e}")
+            print(f"[cache] Delete-pattern error: {e}")
             return 0
     
     def clear_all(self) -> bool:
@@ -146,7 +146,7 @@ class RedisCache:
             self.enabled = False
             return False
         except Exception as e:
-            print(f"⚠️ Cache clear error: {e}")
+            print(f"[cache] Clear error: {e}")
             return False
     
     def generate_key(self, prefix: str, *args, **kwargs) -> str:
@@ -175,7 +175,7 @@ def cached(prefix: str, ttl: Optional[int] = None):
             cache_key = cache.generate_key(prefix, *args, **kwargs)            
             cached_result = cache.get(cache_key)
             if cached_result is not None:
-                print(f"✅ Cache hit: {cache_key}")
+                print(f"[cache] Hit: {cache_key}")
                 return cached_result            
             result = func(*args, **kwargs)            
             if cache.is_available():

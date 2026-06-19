@@ -278,7 +278,33 @@ else:
 
                         import pandas as pd
                         df = pd.DataFrame(result["results"])
-                        essential_columns = ['symbol', 'company_name', 'current_price', 'pe_ratio', 'market_cap', 'recommendation', 'upside_category']
+                        quarterly_data = result.get("quarterly_data", {})
+                        latest_by_symbol = {
+                            quarters[0].get("symbol"): quarters[0]
+                            for quarters in quarterly_data.values()
+                            if isinstance(quarters, list) and quarters
+                        }
+                        if "symbol" in df.columns and latest_by_symbol:
+                            df["latest_quarter"] = df["symbol"].map(
+                                lambda symbol: (
+                                    f"{latest_by_symbol[symbol].get('quarter')} {latest_by_symbol[symbol].get('year')}"
+                                    if symbol in latest_by_symbol else None
+                                )
+                            )
+                            for source, target in [
+                                ("revenue", "quarterly_revenue"),
+                                ("ebitda", "quarterly_ebitda"),
+                                ("net_profit", "quarterly_net_profit"),
+                            ]:
+                                df[target] = df["symbol"].map(
+                                    lambda symbol, field=source: latest_by_symbol.get(symbol, {}).get(field)
+                                )
+
+                        essential_columns = [
+                            'symbol', 'company_name', 'current_price', 'pe_ratio', 'market_cap',
+                            'latest_quarter', 'quarterly_revenue', 'quarterly_ebitda',
+                            'quarterly_net_profit', 'recommendation', 'upside_category'
+                        ]
                         available_columns = []
                         for col in essential_columns:
                             if col in df.columns:
@@ -290,6 +316,10 @@ else:
                             'pe_ratio': 'P/E',
                             'market_cap': 'Market Cap',
                             'current_price': 'Price',
+                            'latest_quarter': 'Latest Quarter',
+                            'quarterly_revenue': 'Quarter Revenue',
+                            'quarterly_ebitda': 'Quarter EBITDA',
+                            'quarterly_net_profit': 'Quarter Net Profit',
                             'recommendation': 'Rating',
                             'upside_category': 'Upside Type'
                         }
@@ -303,6 +333,11 @@ else:
                             df_display['Market Cap'] = df_display['Market Cap'].apply(lambda x: f"${x/1e9:.1f}B" if pd.notnull(x) and x > 0 else "N/A")
                         if 'Price' in df_display.columns:
                             df_display['Price'] = df_display['Price'].apply(lambda x: f"${x:.2f}" if pd.notnull(x) and x > 0 else "N/A")
+                        for col in ['Quarter Revenue', 'Quarter EBITDA', 'Quarter Net Profit']:
+                            if col in df_display.columns:
+                                df_display[col] = df_display[col].apply(
+                                    lambda x: f"${x:,.0f}" if pd.notnull(x) else "N/A"
+                                )
                         
                         def style_upside_category(val):
                             if val == 'Strong Upside':

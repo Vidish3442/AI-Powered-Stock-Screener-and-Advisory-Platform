@@ -107,11 +107,11 @@ class AlertChecker:
             
             self.db.commit()
             
-            print(f"🔔 Alert triggered: {alert['symbol']} - {alert['metric']} {alert['operator']} {alert['threshold']} (Current: {current_value})")
+            print(f"[alerts] Triggered: {alert['symbol']} - {alert['metric']} {alert['operator']} {alert['threshold']} (Current: {current_value})")
             return True
             
         except mysql.connector.Error as e:
-            print(f"❌ Error triggering alert: {e}")
+            print(f"[alerts] Error triggering alert: {e}")
             return False
     
     def check_all_alerts(self) -> Dict:
@@ -152,7 +152,7 @@ class AlertChecker:
             return results
             
         except Exception as e:
-            print(f"❌ Error checking alerts: {e}")
+            print(f"[alerts] Error checking alerts: {e}")
             return {'error': str(e)}
         finally:
             self.close()
@@ -189,7 +189,7 @@ class AlertChecker:
             return self.cursor.fetchall()
             
         except Exception as e:
-            print(f"❌ Error getting user alerts: {e}")
+            print(f"[alerts] Error getting user alerts: {e}")
             return []
         finally:
             self.close()
@@ -201,7 +201,7 @@ def check_alerts_now():
     results = checker.check_all_alerts()
     
     print("\n" + "="*80)
-    print("🔔 Alert Check Results")
+    print("[alerts] Check results")
     print("="*80)
     print(f"Total Alerts Checked: {results.get('total_checked', 0)}")
     print(f"Alerts Triggered: {results.get('triggered', 0)}")

@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: stock-screener-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DB_TARGET
+        value: tidb
+      - key: TIDB_HOST
+        sync: false
+      - key: TIDB_PORT
+        value: "4000"
+      - key: TIDB_USER
+        sync: false
+      - key: TIDB_PASSWORD
+        sync: false
+      - key: TIDB_NAME
+        value: stock_db
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: JWT_SECRET_KEY
+        generateValue: true

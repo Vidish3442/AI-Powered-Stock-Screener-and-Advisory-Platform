@@ -42,23 +42,24 @@ def compile_and_run(dsl):
         
         cursor.execute(base_sql, params)
         results = cursor.fetchall()
-        needs_quarterly = has_quarterly_conditions(dsl)
         quarterly_data = {}
         
-        if needs_quarterly and results:
+        # Always include recent quarterly figures for matching stocks so the
+        # home-page results provide useful financial context for every query.
+        if results:
             quarterly_data = get_optimized_quarterly_data(cursor, results, dsl)
         
         return {
             'stocks': results,
             'quarterly_data': quarterly_data,
-            'has_quarterly': needs_quarterly
+            'has_quarterly': bool(quarterly_data)
         }
         
     except mysql.connector.Error as e:
-        print(f"❌ Database error in compiler: {e}")
+        print(f"[ai] Database error in compiler: {e}")
         raise Exception("Database connection issue. Please try again.")
     except Exception as e:
-        print(f"❌ Compiler error: {e}")
+        print(f"[ai] Compiler error: {e}")
         raise Exception(f"Query processing error: {str(e)}")
     finally:
         if cursor:

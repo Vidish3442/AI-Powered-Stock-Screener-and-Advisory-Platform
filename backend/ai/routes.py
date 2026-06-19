@@ -12,11 +12,13 @@ def screener(query: str, current_user=Depends(get_current_user)):
             raise HTTPException(status_code=400, detail="Query cannot be empty")
         
         query_normalized = query.strip().lower()        
-        cache_key = cache.generate_key("screener", query_normalized)
+        # Version the cache because screener responses now always include
+        # quarterly data, including for non-quarterly filters.
+        cache_key = cache.generate_key("screener_v2", query_normalized)
         cached_result = cache.get(cache_key)
         
         if cached_result is not None:
-            print(f"✅ Returning cached result for query: {query_normalized}")
+            print(f"[ai] Returning cached result for query: {query_normalized}")
             return cached_result
         dsl, result_data = run_engine(query.strip())
         response = {

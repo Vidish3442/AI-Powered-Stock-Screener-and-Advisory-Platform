@@ -4,27 +4,32 @@ Tests authentication, portfolio, alerts, and screener endpoints
 """
 
 import requests
-import json
+import os
+import pytest
 
 API_URL = "http://127.0.0.1:8001"
 
-def test_authentication():
-    """Test authentication endpoints."""
-    print("\n1. Testing login with valid credentials...")
+@pytest.fixture(scope="session")
+def token():
+    """Authenticate with credentials supplied only through the environment."""
+    email = os.getenv("TEST_USER_EMAIL")
+    password = os.getenv("TEST_USER_PASSWORD")
+    if not email or not password:
+        pytest.skip("Set TEST_USER_EMAIL and TEST_USER_PASSWORD to run API tests")
+
     response = requests.post(f"{API_URL}/auth/login", json={
-        "email": "vk@example.com",
-        "password": "vkqwerty12345"
-    })
-    
-    if response.status_code == 200:
-        data = response.json()
-        token = data.get('token')
-        print(f"Login successful")
-        print(f"Token: {token[:20]}...")
-        return token
-    else:
-        print(f"Login failed: {response.status_code}")
-        return None
+        "email": email,
+        "password": password,
+    }, timeout=15)
+    assert response.status_code == 200, "Test-user login failed"
+    access_token = response.json().get("token")
+    assert access_token, "Login response did not include a token"
+    return access_token
+
+
+def test_authentication(token):
+    """Confirm that the shared authentication fixture can log in."""
+    assert token
 
 def test_portfolio_endpoints(token):
     """Test portfolio endpoints."""
