@@ -191,7 +191,7 @@ Create a `.env` file in the root directory:
 # Database Configuration
 DB_HOST=localhost
 DB_USER=stock_user
-DB_PASSWORD=Stock@123
+DB_PASSWORD=your_private_database_password
 DB_NAME=stock_db
 
 # JWT Configuration

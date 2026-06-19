@@ -143,7 +143,9 @@ CREATE TABLE analyst_targets (
         REFERENCES stocks(stock_id)
         ON DELETE CASCADE
 );
-CREATE USER 'stock_user'@'localhost' IDENTIFIED BY 'Stock@123';
+-- Replace this placeholder locally before running the user-creation statement.
+-- Never commit a real database password to source control.
+CREATE USER 'stock_user'@'localhost' IDENTIFIED BY 'CHANGE_ME_BEFORE_RUNNING';
 
 GRANT SELECT, INSERT, UPDATE, DELETE
 ON stock_db.*
