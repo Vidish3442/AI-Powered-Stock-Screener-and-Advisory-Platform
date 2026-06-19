@@ -6,6 +6,7 @@ google-generativeai
 pydantic
 streamlit
 requests
+certifi
 python-multipart
 PyJWT
 yfinance
