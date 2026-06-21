@@ -692,7 +692,7 @@ python ingest_fundamentals.py
 ## 🙏 Acknowledgments
 
 - **Yahoo Finance** for stock data
-- **OpenRouter** for access to an OpenAI-compatible natural-language processing API
+- **Openrouter AI** for natural language processing
 - **FastAPI** for the excellent web framework
 - **Streamlit** for the intuitive UI framework
 - **Redis** for high-performance caching
