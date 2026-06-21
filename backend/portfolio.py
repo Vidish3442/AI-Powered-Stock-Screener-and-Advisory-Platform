@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from backend.auth import get_current_user
 from backend.database import get_db
@@ -7,9 +9,10 @@ import mysql.connector
 from datetime import datetime
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
+logger = logging.getLogger(__name__)
 
 class PortfolioCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=100)
 
 class PortfolioResponse(BaseModel):
     portfolio_id: int
@@ -20,9 +23,9 @@ class PortfolioResponse(BaseModel):
     total_value: float
 
 class HoldingCreate(BaseModel):
-    stock_id: int
-    quantity: int
-    avg_price: float
+    stock_id: int = Field(gt=0)
+    quantity: int = Field(gt=0, le=1_000_000_000)
+    avg_price: float = Field(ge=0, le=1_000_000_000, allow_inf_nan=False)
 
 class HoldingResponse(BaseModel):
     holding_id: int
@@ -64,8 +67,9 @@ async def get_user_portfolios(current_user: dict = Depends(get_current_user)):
         portfolios = cursor.fetchall()
         return portfolios
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to list portfolios")
+        raise HTTPException(status_code=500, detail="Unable to load portfolios")
     finally:
         cursor.close()
         db.close()
@@ -89,8 +93,9 @@ async def create_portfolio(portfolio: PortfolioCreate, current_user: dict = Depe
         
     except mysql.connector.IntegrityError:
         raise HTTPException(status_code=400, detail="Portfolio name already exists for this user")
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to create portfolio")
+        raise HTTPException(status_code=500, detail="Unable to create portfolio")
     finally:
         cursor.close()
         db.close()
@@ -142,8 +147,9 @@ async def get_portfolio_holdings(portfolio_id: int, current_user: dict = Depends
         holdings = cursor.fetchall()
         return holdings
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to load portfolio holdings")
+        raise HTTPException(status_code=500, detail="Unable to load portfolio holdings")
     finally:
         cursor.close()
         db.close()
@@ -176,8 +182,9 @@ async def add_holding(portfolio_id: int, holding: HoldingCreate, current_user: d
         
         return {"holding_id": holding_id, "message": "Holding added successfully"}
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to add portfolio holding")
+        raise HTTPException(status_code=500, detail="Unable to add holding")
     finally:
         cursor.close()
         db.close()
@@ -202,8 +209,9 @@ async def delete_portfolio(portfolio_id: int, current_user: dict = Depends(get_c
         
         return {"message": "Portfolio deleted successfully"}
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to delete portfolio")
+        raise HTTPException(status_code=500, detail="Unable to delete portfolio")
     finally:
         cursor.close()
         db.close()
@@ -236,8 +244,9 @@ async def update_holding(portfolio_id: int, holding_id: int, holding: HoldingCre
         
         return {"message": "Holding updated successfully"}
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to update portfolio holding")
+        raise HTTPException(status_code=500, detail="Unable to update holding")
     finally:
         cursor.close()
         db.close()
@@ -264,8 +273,9 @@ async def delete_holding(portfolio_id: int, holding_id: int, current_user: dict 
         
         return {"message": "Holding deleted successfully"}
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to delete portfolio holding")
+        raise HTTPException(status_code=500, detail="Unable to delete holding")
     finally:
         cursor.close()
         db.close()
@@ -296,15 +306,19 @@ async def update_holding(portfolio_id: int, holding_id: int, holding: HoldingCre
 
         return {"message": "Holding updated successfully"}
 
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to update portfolio holding")
+        raise HTTPException(status_code=500, detail="Unable to update holding")
     finally:
         cursor.close()
         db.close()
 
 
 @router.get("/stocks/search")
-async def search_stock_by_symbol(symbol: str, current_user: dict = Depends(get_current_user)):
+async def search_stock_by_symbol(
+    symbol: str = Query(min_length=1, max_length=20),
+    current_user: dict = Depends(get_current_user),
+):
     """Search for a stock by symbol for adding to portfolio."""
     db = get_db()
     cursor = db.cursor(dictionary=True)
@@ -327,8 +341,9 @@ async def search_stock_by_symbol(symbol: str, current_user: dict = Depends(get_c
         else:
             raise HTTPException(status_code=404, detail=f"Stock symbol '{symbol}' not found")
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to search portfolio stocks")
+        raise HTTPException(status_code=500, detail="Unable to search stocks")
     finally:
         cursor.close()
         db.close()
@@ -362,8 +377,9 @@ async def get_portfolio_summary(current_user: dict = Depends(get_current_user)):
             
         return summary
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to load portfolio summary")
+        raise HTTPException(status_code=500, detail="Unable to load portfolio summary")
     finally:
         cursor.close()
         db.close()

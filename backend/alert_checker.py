@@ -5,7 +5,7 @@ Alert Checker Service - Monitors stock prices and triggers alerts
 from backend.database import get_db
 import mysql.connector
 from datetime import datetime
-from typing import List, Dict
+from typing import Dict, List, Optional
 
 class AlertChecker:
     """Service to check and trigger alerts based on current stock data."""
@@ -26,8 +26,10 @@ class AlertChecker:
         if self.db:
             self.db.close()
     
-    def get_active_alerts(self) -> List[Dict]:
-        """Get all active alerts."""
+    def get_active_alerts(self, user_id: Optional[int] = None) -> List[Dict]:
+        """Get active alerts, optionally restricted to one user."""
+        user_filter = " AND a.user_id = %s" if user_id is not None else ""
+        params = (user_id,) if user_id is not None else ()
         self.cursor.execute("""
             SELECT 
                 a.alert_id,
@@ -48,7 +50,7 @@ class AlertChecker:
             JOIN stocks s ON a.stock_id = s.stock_id
             LEFT JOIN fundamentals f ON s.stock_id = f.stock_id
             WHERE a.is_active = TRUE
-        """)
+        """ + user_filter, params)
         return self.cursor.fetchall()
     
     def get_metric_value(self, alert: Dict) -> float:
@@ -114,12 +116,12 @@ class AlertChecker:
             print(f"[alerts] Error triggering alert: {e}")
             return False
     
-    def check_all_alerts(self) -> Dict:
-        """Check all active alerts and trigger if conditions are met."""
+    def check_all_alerts(self, user_id: Optional[int] = None) -> Dict:
+        """Check active alerts for one user, or all users for the CLI worker."""
         try:
             self.connect()
             
-            alerts = self.get_active_alerts()
+            alerts = self.get_active_alerts(user_id)
             
             results = {
                 'total_checked': len(alerts),
@@ -195,10 +197,10 @@ class AlertChecker:
             self.close()
 
 
-def check_alerts_now():
-    """Standalone function to check all alerts immediately."""
+def check_alerts_now(user_id: Optional[int] = None):
+    """Check one user's alerts, or all alerts when invoked by the CLI worker."""
     checker = AlertChecker()
-    results = checker.check_all_alerts()
+    results = checker.check_all_alerts(user_id)
     
     print("\n" + "="*80)
     print("[alerts] Check results")

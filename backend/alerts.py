@@ -1,20 +1,24 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from backend.auth import get_current_user
 from backend.database import get_db
 from backend.alert_checker import AlertChecker, check_alerts_now
+from backend.security import rate_limiter
 import mysql.connector
 from datetime import datetime
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
+logger = logging.getLogger(__name__)
 
 class AlertCreate(BaseModel):
-    stock_id: int
-    portfolio_id: int
-    metric: str  
-    operator: str 
-    threshold: float
+    stock_id: int = Field(gt=0)
+    portfolio_id: int = Field(gt=0)
+    metric: str = Field(min_length=1, max_length=50)
+    operator: str = Field(min_length=1, max_length=2)
+    threshold: float = Field(ge=0, allow_inf_nan=False)
 
 class AlertResponse(BaseModel):
     alert_id: int
@@ -77,8 +81,9 @@ async def get_user_alerts(current_user: dict = Depends(get_current_user)):
         alerts = cursor.fetchall()
         return alerts
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to list alerts")
+        raise HTTPException(status_code=500, detail="Unable to load alerts")
     finally:
         cursor.close()
         db.close()
@@ -117,8 +122,9 @@ async def create_alert(alert: AlertCreate, current_user: dict = Depends(get_curr
         
         return {"alert_id": alert_id, "message": "Alert created successfully"}
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to create alert")
+        raise HTTPException(status_code=500, detail="Unable to create alert")
     finally:
         cursor.close()
         db.close()
@@ -143,8 +149,9 @@ async def delete_alert(alert_id: int, current_user: dict = Depends(get_current_u
         
         return {"message": "Alert deleted successfully"}
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to delete alert")
+        raise HTTPException(status_code=500, detail="Unable to delete alert")
     finally:
         cursor.close()
         db.close()
@@ -174,14 +181,18 @@ async def toggle_alert(alert_id: int, current_user: dict = Depends(get_current_u
         
         return {"message": f"Alert {'activated' if new_status else 'deactivated'} successfully", "is_active": new_status}
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to toggle alert")
+        raise HTTPException(status_code=500, detail="Unable to update alert")
     finally:
         cursor.close()
         db.close()
 
 @router.get("/events", response_model=List[AlertEventResponse])
-async def get_alert_events(current_user: dict = Depends(get_current_user), limit: int = 50):
+async def get_alert_events(
+    current_user: dict = Depends(get_current_user),
+    limit: int = Query(default=50, ge=1, le=100),
+):
     """Get most recent alert event for each alert."""
     db = get_db()
     cursor = db.cursor(dictionary=True)
@@ -215,14 +226,18 @@ async def get_alert_events(current_user: dict = Depends(get_current_user), limit
         events = cursor.fetchall()
         return events
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to load alert events")
+        raise HTTPException(status_code=500, detail="Unable to load alert events")
     finally:
         cursor.close()
         db.close()
 
 @router.get("/stocks/search")
-async def search_stock_by_symbol(symbol: str):
+async def search_stock_by_symbol(
+    symbol: str = Query(min_length=1, max_length=20),
+    current_user: dict = Depends(get_current_user),
+):
     """Search for a stock by symbol."""
     db = get_db()
     cursor = db.cursor(dictionary=True)
@@ -240,14 +255,15 @@ async def search_stock_by_symbol(symbol: str):
         else:
             raise HTTPException(status_code=404, detail=f"Stock symbol '{symbol}' not found")
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to search stocks")
+        raise HTTPException(status_code=500, detail="Unable to search stocks")
     finally:
         cursor.close()
         db.close()
 
 @router.get("/stocks/list")
-async def list_all_stocks():
+async def list_all_stocks(current_user: dict = Depends(get_current_user)):
     """Get all stocks for dropdown selection."""
     db = get_db()
     cursor = db.cursor(dictionary=True)
@@ -262,8 +278,9 @@ async def list_all_stocks():
         stocks = cursor.fetchall()
         return stocks
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to list stocks")
+        raise HTTPException(status_code=500, detail="Unable to list stocks")
     finally:
         cursor.close()
         db.close()
@@ -289,30 +306,41 @@ async def get_alert_summary(current_user: dict = Depends(get_current_user)):
         summary = cursor.fetchone()
         return summary
         
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except mysql.connector.Error:
+        logger.exception("Failed to load alert summary")
+        raise HTTPException(status_code=500, detail="Unable to load alert summary")
     finally:
         cursor.close()
         db.close()
 
 @router.post("/check")
-async def check_alerts(current_user: dict = Depends(get_current_user)):
-    """Manually trigger alert checking for all active alerts."""
+async def check_alerts(request: Request, current_user: dict = Depends(get_current_user)):
+    """Manually trigger alert checking for the authenticated user."""
+    rate_limiter.check(
+        f"alert-check:user:{current_user['user_id']}",
+        limit=10,
+        window_seconds=60,
+    )
     try:
-        results = check_alerts_now()
+        results = check_alerts_now(current_user["user_id"])
         return {
             "message": "Alert check completed",
             "results": results
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error checking alerts: {str(e)}")
+    except Exception:
+        logger.exception("Alert check failed")
+        raise HTTPException(status_code=500, detail="Unable to check alerts")
 
 @router.get("/notifications")
-async def get_notifications(current_user: dict = Depends(get_current_user), limit: int = 20):
+async def get_notifications(
+    current_user: dict = Depends(get_current_user),
+    limit: int = Query(default=20, ge=1, le=100),
+):
     """Get recent alert notifications for the current user."""
     checker = AlertChecker()
     try:
         notifications = checker.get_user_triggered_alerts(current_user["user_id"], limit)
         return notifications
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting notifications: {str(e)}")
+    except Exception:
+        logger.exception("Failed to load notifications")
+        raise HTTPException(status_code=500, detail="Unable to load notifications")

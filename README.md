@@ -1,10 +1,10 @@
 # 📊 AI Stock Screener - Intelligent Stock Analysis Platform
 
-An advanced stock screening platform powered by AI that enables users to analyze stocks using natural language queries, manage portfolios, and set up intelligent price alerts with real-time notifications.
+An advanced stock screening platform powered by AI that enables users to analyze stocks using natural language queries, manage portfolios, and set up intelligent metric alerts with in-app notifications.
 
 ## 🎯 Project Overview
 
-AI Stock Screener is a comprehensive stock analysis platform that combines the power of artificial intelligence with traditional financial analysis. Users can screen stocks using natural language queries like "Technology stocks with PE less than 20" or "Large cap stocks with positive profit for last 4 quarters", manage multiple portfolios, and receive real-time alerts when stock metrics meet specified conditions.
+AI Stock Screener is a comprehensive stock analysis platform that combines the power of artificial intelligence with traditional financial analysis. Users can screen stocks using natural language queries like "Technology stocks with PE less than 20" or "Large cap stocks with positive profit for last 4 quarters", manage multiple portfolios, and check alerts when stored stock metrics meet specified conditions.
 
 ## 🧱 Technology Stack
 
@@ -12,7 +12,7 @@ AI Stock Screener is a comprehensive stock analysis platform that combines the p
 - **FastAPI**: High-performance Python web framework for building APIs
 - **MySQL**: Robust relational database for storing stock data, user information, and portfolios
 - **Redis**: In-memory caching for improved query performance (optional)
-- **OpenAI**: Natural language processing for query understanding
+- **OpenRouter (OpenAI-compatible API)**: Natural language processing for query understanding
 - **JWT Authentication**: Secure user authentication and authorization
 
 ### Frontend
@@ -21,7 +21,7 @@ AI Stock Screener is a comprehensive stock analysis platform that combines the p
 - **Requests**: HTTP client for API communication
 
 ### Data Ingestion
-- **yfinance**: Real-time stock data fetching from Yahoo Finance
+- **yfinance**: Stock data ingestion from Yahoo Finance
 - **Python Scripts**: Automated data ingestion pipelines
 
 ## ⚙️ Core Features
@@ -40,7 +40,7 @@ AI Stock Screener is a comprehensive stock analysis platform that combines the p
 - **Edit Holdings**: Update quantity and purchase price for any holding
 - **Delete Holdings**: Remove individual holdings from portfolios
 - **Holdings Tracking**: Track quantity, average price, and current value
-- **Gain/Loss Analysis**: Real-time profit/loss calculations with percentage changes
+- **Gain/Loss Analysis**: Profit/loss calculations using the latest prices stored in the database
 - **Portfolio Summary**: Overview of total invested amount and current value
 - **Stock-Level Details**: Detailed breakdown of each holding's performance
 - **Portfolio Deletion**: Delete entire portfolios with confirmation
@@ -48,7 +48,7 @@ AI Stock Screener is a comprehensive stock analysis platform that combines the p
 ### 3. Intelligent Price Alerts
 - **Multi-Metric Monitoring**: Track price, PE ratio, market cap, EPS, ROE, dividend yield
 - **Flexible Conditions**: Set alerts with operators (>, <, >=, <=, =)
-- **Real-Time Notifications**: Compact notification bell with badge counter
+- **In-App Notifications**: Compact notification bell with badge counter
 - **Alert Management**: Bulk operations (activate, deactivate, delete)
 - **Trigger History**: View when and why alerts were triggered
 - **Manual Refresh**: On-demand alert checking with one click
@@ -56,8 +56,8 @@ AI Stock Screener is a comprehensive stock analysis platform that combines the p
 
 ### 4. Redis Caching System
 - **Graceful Fallback**: Works seamlessly with or without Redis
-- **Performance Boost**: 30-40% faster query responses
-- **Configurable TTL**: Customizable cache expiration times
+- **Repeated-Query Performance**: Avoids rerunning identical screener queries during the cache window
+- **Cache TTL**: Screener responses use a 10-minute cache
 - **Cache Management**: Health checks, statistics, and manual clearing
 - **Monitoring Tools**: Built-in cache viewer utility
 
@@ -69,10 +69,10 @@ AI Stock Screener is a comprehensive stock analysis platform that combines the p
   - ✅ **Solution**: Natural language queries - just ask in plain English
   
 - **Manual Portfolio Tracking**: Spreadsheets and manual calculations are error-prone
-  - ✅ **Solution**: Automated portfolio management with real-time calculations
+  - ✅ **Solution**: Automated portfolio calculations using stored market data
   
 - **Missed Opportunities**: Constantly checking stock prices is time-consuming
-  - ✅ **Solution**: Intelligent alerts with real-time notifications
+  - ✅ **Solution**: Metric alerts with in-app notifications when alert checks run
   
 - **Slow Performance**: Repeated database queries slow down analysis
   - ✅ **Solution**: Redis caching for instant responses
@@ -83,7 +83,7 @@ AI Stock Screener is a comprehensive stock analysis platform that combines the p
 ## ✅ Key Benefits
 
 - **Centralized Platform**: All stock analysis tools in one place
-- **Better Communication**: Real-time alerts keep you informed
+- **Better Communication**: In-app alert results keep you informed when checks run
 - **Higher Engagement**: Interactive UI makes analysis enjoyable
 - **Streamlined Operations**: Automated calculations and data updates
 - **Scalability**: Handles growing data and users efficiently
@@ -118,7 +118,7 @@ AI Stock Screener is a comprehensive stock analysis platform that combines the p
 
 2. **Authentication** (`backend/auth.py`)
    - JWT token-based authentication
-   - Password hashing with bcrypt
+   - Password hashing with a per-password salt and SHA-256
    - User registration and login
 
 3. **Portfolio System** (`backend/portfolio.py`)
@@ -128,12 +128,11 @@ AI Stock Screener is a comprehensive stock analysis platform that combines the p
 
 4. **Alert System** (`backend/alerts.py`, `backend/alert_checker.py`)
    - Alert creation and management
-   - Background alert monitoring
+   - On-demand alert checking
    - Event tracking and notifications
 
 5. **Caching Layer** (`backend/cache.py`)
    - Redis integration with fallback
-   - Automatic cache invalidation
    - Performance monitoring
 
 6. **Data Ingestion** (`ingestion/`)
@@ -190,16 +189,20 @@ Create a `.env` file in the root directory:
 ```env
 # Database Configuration
 DB_HOST=localhost
+DB_PORT=3306
 DB_USER=stock_user
 DB_PASSWORD=your_private_database_password
 DB_NAME=stock_db
+DB_TARGET=local
 
 # JWT Configuration
-JWT_SECRET=your_secret_key_here
-JWT_ALGORITHM=HS256
+JWT_SECRET_KEY=your_secret_key_here
 
 # AI Configuration
-GEMINI_API_KEY=your_gemini_api_key_here
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# Optional ingestion fallback; quarterly ingestion requires this
+ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key_here
 
 # Redis Configuration (Optional)
 REDIS_HOST=localhost
@@ -223,7 +226,11 @@ This will populate your database with:
 - Stock symbols and company information
 - Fundamental metrics
 - Quarterly financial data
-- Analyst targets and recommendations
+
+Analyst targets are generated separately as demonstration data:
+```bash
+python ingest_analyst_targets.py
+```
 
 ### Step 6: Start Redis (Optional)
 ```bash
@@ -237,8 +244,6 @@ sudo service redis-server start
 docker run -d -p 6379:6379 --name redis redis:latest
 ```
 
-See [REDIS_SETUP.md](REDIS_SETUP.md) for detailed Redis installation instructions.
-
 ### Step 7: Start Backend Server
 ```bash
 uvicorn backend.main:app --host 127.0.0.1 --port 8001 --reload
@@ -246,7 +251,7 @@ uvicorn backend.main:app --host 127.0.0.1 --port 8001 --reload
 
 You should see:
 ```
-✅ Redis cache enabled at localhost:6379
+[cache] Redis enabled at localhost:6379
 INFO:     Uvicorn running on http://127.0.0.1:8001
 ```
 
@@ -296,7 +301,7 @@ The application will open in your browser at `http://localhost:8501`
    - Click "Add to Portfolio"
 3. **Edit Holdings**: Click ✏️ button next to any holding to update quantity or price
 4. **Delete Holdings**: Click 🗑️ button to remove a holding from portfolio
-5. **View Performance**: See real-time gain/loss for each holding with percentage changes
+5. **View Performance**: See gain/loss for each holding using the latest price stored in the database
 6. **Track Summary**: Monitor total invested vs current value across all portfolios
 7. **Delete Portfolio**: Click "Delete Portfolio" button with confirmation to remove entire portfolio
 
@@ -311,7 +316,7 @@ The application will open in your browser at `http://localhost:8501`
    - Threshold value
    - Select portfolio
 4. **Click "Create Alert"**
-5. **Monitor**: Check notification bell for triggered alerts
+5. **Monitor**: Run an alert check and use the notification bell to view triggered alerts
 
 ### Alert Management
 
@@ -487,8 +492,6 @@ python view_cache.py monitor
 
 ### Caching Strategy
 - **Screener queries**: 10-minute TTL
-- **Stock fundamentals**: 1-hour TTL
-- **Automatic invalidation**: On data updates
 - **Graceful fallback**: Direct database queries if Redis unavailable
 
 ### Database Indexes
@@ -502,12 +505,12 @@ Run `add_indexes.sql` to add performance indexes:
 - **DISTINCT** and **GROUP BY** prevent duplicate results
 - **LEFT JOIN** for optional data (quarterly financials)
 - **Indexed columns** for faster filtering
-- **Connection pooling** for concurrent requests
+- **Per-request database connections** are closed after use
 
 ## 🔒 Security Features
 
 - **JWT Authentication**: Secure token-based authentication
-- **Password Hashing**: Bcrypt encryption for passwords
+- **Password Hashing**: Per-password salts with SHA-256 hashing
 - **SQL Injection Prevention**: Parameterized queries
 - **CORS Protection**: Restricted origins
 - **Environment Variables**: Sensitive data in `.env` (gitignored)
@@ -517,6 +520,9 @@ Run `add_indexes.sql` to add performance indexes:
 
 ### Run Tests
 ```bash
+# Install the test runner (it is not currently listed in requirements.txt)
+pip install pytest
+
 # Test validator
 python -m pytest tests/test_validator.py
 
@@ -554,15 +560,6 @@ Screenshots available in `img/` directory.
 - **🌐 Multi-Market Support**: International stock exchanges
 - **👥 Social Features**: Share portfolios and strategies
 
-## 👥 Team Members
-
-- **Satyam Mohanty**
-- **Jayanth Reddy**
-- **Samruddhi Garge**
-- **Sahil Tripathy**
-- **Abinaya Sri**
-- **Srishti Sinha**
-
 ## 📁 Project Structure
 
 ```
@@ -599,7 +596,6 @@ Stock-Screener/
 ├── add_indexes.sql              # Performance indexes
 ├── requirements.txt             # Python dependencies
 ├── view_cache.py                # Redis cache viewer utility
-├── REDIS_SETUP.md               # Redis installation guide
 ├── .env                         # Environment variables (gitignored)
 ├── .gitignore                   # Git ignore rules
 └── README.md                    # This file
@@ -637,8 +633,7 @@ Contributions are welcome! Please follow these steps:
 
 For issues, questions, or suggestions:
 - Open an issue on GitHub
-- Contact the development team
-- Check documentation in `REDIS_SETUP.md` for caching issues
+- Include relevant logs and setup details, but never include credentials
 
 ## 🔧 Troubleshooting
 
@@ -647,9 +642,9 @@ For issues, questions, or suggestions:
 **Problem**: "Stock symbol 'AAPL' not found in database"
 
 **Solutions**:
-1. Check if stocks are in database:
+1. Check whether the `stocks` table contains data in MySQL:
    ```bash
-   python check_stocks.py
+   mysql -u stock_user -p stock_db -e "SELECT COUNT(*) AS stock_count FROM stocks;"
    ```
 
 2. If no stocks found, run data ingestion:
@@ -692,12 +687,12 @@ python ingest_fundamentals.py
 
 **Problem**: Redis connection failed
 
-**Solution**: This is normal if Redis isn't installed. The application works fine without it. See [REDIS_SETUP.md](REDIS_SETUP.md) for installation.
+**Solution**: This is normal if Redis isn't installed. The application continues without caching. Start Redis using one of the commands in the setup section if caching is required.
 
 ## 🙏 Acknowledgments
 
 - **Yahoo Finance** for stock data
-- **Google Gemini AI** for natural language processing
+- **OpenRouter** for access to an OpenAI-compatible natural-language processing API
 - **FastAPI** for the excellent web framework
 - **Streamlit** for the intuitive UI framework
 - **Redis** for high-performance caching
