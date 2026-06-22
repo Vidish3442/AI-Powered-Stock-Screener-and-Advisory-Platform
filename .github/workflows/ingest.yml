@@ -47,7 +47,6 @@ jobs:
             echo "TIDB_USER=${{ secrets.TIDB_USER }}"
             echo "TIDB_PASSWORD=${{ secrets.TIDB_PASSWORD }}"
             echo "TIDB_DB=${{ secrets.TIDB_DB }}"
-            echo "TIDB_CA=.certs/isrgrootx1.pem"
           } > .env.tidb
           echo "✅ .env.tidb written"
 

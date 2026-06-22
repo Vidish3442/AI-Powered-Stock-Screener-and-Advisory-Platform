@@ -20,25 +20,20 @@ def get_db():
     user     = os.getenv("TIDB_USER")
     password = os.getenv("TIDB_PASSWORD")
     database = os.getenv("TIDB_DB", "stock_db")
-    ssl_ca   = os.getenv("TIDB_CA")
 
     if not host or not user or not password:
         raise ValueError(
             "Missing TiDB config. Ensure TIDB_HOST, TIDB_USER, TIDB_PASSWORD are set in .env.tidb"
         )
 
-    # Resolve CA cert path — try relative to project root, then absolute, then skip
-    if ssl_ca:
-        candidate = _base / ssl_ca          # e.g.  project/.certs/isrgrootx1.pem
-        if candidate.exists():
-            ssl_ca = str(candidate)
-        elif Path(ssl_ca).exists():          # already absolute
-            ssl_ca = str(Path(ssl_ca))
-        else:
-            # In CI the cert is written by the workflow step; if missing, connect
-            # without cert verification (still TLS-encrypted, just no chain check)
-            print(f"⚠️  CA cert not found at '{ssl_ca}' — connecting without cert verification")
-            ssl_ca = None
+    # CA cert: always at .certs/isrgrootx1.pem relative to project root
+    ssl_ca_path = _base / ".certs" / "isrgrootx1.pem"
+    if ssl_ca_path.exists():
+        ssl_ca = str(ssl_ca_path)
+        print(f"🔒 Using CA cert: {ssl_ca_path.name}")
+    else:
+        ssl_ca = None
+        print("⚠️  CA cert not found — connecting without cert verification (still TLS encrypted)")
 
     try:
         conn_kwargs = {

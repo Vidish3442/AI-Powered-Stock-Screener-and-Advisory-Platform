@@ -21,16 +21,20 @@ AI Stock Screener is a comprehensive stock analysis platform that combines the p
 - **Requests**: HTTP client for API communication
 
 ### Data Ingestion
-- **yfinance**: Stock data ingestion from Yahoo Finance
-- **Python Scripts**: Automated data ingestion pipelines
+- **yfinance**: Stock data ingestion from Yahoo Finance (sole data source)
+- **TiDB Cloud**: Serverless MySQL-compatible cloud database for production storage
+- **GitHub Actions**: Automated scheduled ingestion (daily + monthly)
+- **Python Scripts**: Modular ingestion pipeline
 
 ## ⚙️ Core Features
 
 ### 1. AI-Powered Stock Screening
 - **Natural Language Queries**: Ask questions in plain English
-- **Intelligent Query Parsing**: AI converts natural language to structured queries
-- **Multi-Criteria Filtering**: Combine multiple conditions (PE ratio, market cap, profitability, etc.)
-- **Quarterly Financial Analysis**: Analyze revenue, EBITDA, and net profit trends
+- **Sector Filtering**: Query by sector — `"tech stocks"`, `"healthcare stocks"`, `"energy stocks"` etc.
+- **Country & ADR Filtering**: `"Indian stocks"`, `"Chinese ADRs"`, `"US large cap stocks"`
+- **Intelligent Query Parsing**: AI converts natural language to structured SQL via DSL
+- **Multi-Criteria Filtering**: Combine sector, PE, market cap, ROE, dividend yield and more
+- **Quarterly Financial Analysis**: Revenue, EBITDA, and net profit trends — shown **only when the query asks for quarterly data**
 - **Analyst Recommendations**: View target prices and upside potential
 - **Redis Caching**: Lightning-fast responses for repeated queries (10-minute cache)
 
@@ -136,29 +140,35 @@ AI Stock Screener is a comprehensive stock analysis platform that combines the p
    - Performance monitoring
 
 6. **Data Ingestion** (`ingestion/`)
-   - Stock data fetching from Yahoo Finance
-   - Fundamental metrics ingestion
-   - Quarterly financial data
-   - Analyst targets and recommendations
+   - **yfinance only** — no third-party API keys required
+   - 170+ stocks across US Tech, Finance, Healthcare, Consumer, Energy, Industrials, Real Estate, Utilities, and International ADRs (India, China, Europe, Asia-Pacific)
+   - Fundamental metrics, quarterly financials (up to 5 years / 20 quarters), analyst targets
+   - TiDB Cloud as production target via `.env.tidb` + SSL cert
+   - GitHub Actions for automated scheduled refreshes
 
 ## 📊 Database Schema
 
 ### Core Tables
 - **users**: User accounts and authentication
-- **stocks**: Stock symbols and company information
-- **fundamentals**: Current stock metrics (PE, EPS, market cap, etc.)
-- **quarterly_finance**: Historical quarterly financial data
+- **stocks**: 170+ stock symbols, company info, sector, country, ADR flag
+- **fundamentals**: Current metrics (PE, EPS, market cap, ROE, price …)
+- **quarterly_finance**: Up to 20 quarters (5 years) of revenue / EBITDA / net profit per stock
 - **analyst_targets**: Analyst recommendations and target prices
 - **portfolio**: User portfolios
 - **portfolio_holdings**: Stock holdings in portfolios
-- **alerts**: User-defined price alerts
+- **alerts**: User-defined metric alerts
 - **alert_event**: Alert trigger history
+
+### Cloud Database
+Production data is stored on **TiDB Cloud** (serverless MySQL-compatible).  
+Connection config lives in `.env.tidb` (gitignored).  
+The CA certificate is stored at `.certs/isrgrootx1.pem` (gitignored).
 
 ## 🚀 Installation & Setup
 
 ### Prerequisites
 - Python 3.8+
-- MySQL 8.0+
+- MySQL 8.0+ **or** TiDB Cloud account (for production)
 - Redis (optional, for caching)
 
 ### Step 1: Clone Repository
@@ -185,52 +195,68 @@ source add_indexes.sql
 ```
 
 ### Step 4: Environment Configuration
-Create a `.env` file in the root directory:
+
+**Local MySQL** — create `.env` in the root:
 ```env
-# Database Configuration
+# Database
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=stock_user
-DB_PASSWORD=your_private_database_password
+DB_PASSWORD=your_database_password
 DB_NAME=stock_db
-DB_TARGET=local
 
-# JWT Configuration
+# JWT
 JWT_SECRET_KEY=your_secret_key_here
 
-# AI Configuration
+# AI
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 
-# Optional ingestion fallback; quarterly ingestion requires this
-ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key_here
-
-# Redis Configuration (Optional)
+# Redis (optional)
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_DB=0
 REDIS_PASSWORD=
 CACHE_TTL=3600
 
-# API Configuration
+# API
 API_URL=http://127.0.0.1:8001
 ```
 
+**TiDB Cloud** — create `.env.tidb` in the root (used by ingestion scripts only):
+```env
+DB_TARGET=tidb
+TIDB_HOST=gateway01.ap-southeast-1.prod.aws.tidbcloud.com
+TIDB_PORT=4000
+TIDB_USER=your_tidb_user
+TIDB_PASSWORD=your_tidb_password
+TIDB_DB=stock_db
+TIDB_CA=.certs/isrgrootx1.pem
+```
+Download the ISRG Root X1 CA cert from [letsencrypt.org](https://letsencrypt.org/certs/isrgrootx1.pem) and place it at `.certs/isrgrootx1.pem`.
+
 ### Step 5: Data Ingestion
+
+All ingestion uses **yfinance only** — no API keys required.
+
 ```bash
-# Run all ingestion scripts
 cd ingestion
-python run_all.py
+python run_all.py          # runs all 4 steps
 ```
 
-This will populate your database with:
-- Stock symbols and company information
-- Fundamental metrics
-- Quarterly financial data
-
-Analyst targets are generated separately as demonstration data:
+Or run individual steps:
 ```bash
-python ingest_analyst_targets.py
+python ingest_stocks.py             # Step 1 — stock symbols & company info
+python ingest_fundamentals.py       # Step 2 — PE, price, ROE, EPS …
+python ingest_quarterly_financials.py  # Step 3 — up to 20 quarters per stock
+python ingest_analyst_targets.py    # Step 4 — analyst targets (derived from fundamentals)
 ```
+
+Resume from a specific step (useful after a partial run):
+```bash
+python run_all.py --from 2    # skip stocks, start at fundamentals
+```
+
+**Target: TiDB Cloud** — ingestion scripts read from `.env.tidb` automatically.
 
 ### Step 6: Start Redis (Optional)
 ```bash
@@ -276,19 +302,30 @@ The application will open in your browser at `http://localhost:8501`
 ### Stock Screening Examples
 
 ```
-# Basic queries
+# Basic metric filters
 "PE ratio > 15"
-"Technology stocks with market cap > 100B"
 "Dividend yield > 2%"
+"Large cap stocks with ROE > 15%"
 
-# Complex queries
-"PE ratio >= 5 and positive net profit for last 4 quarters"
-"Large cap stocks with ROE > 15 and debt to equity < 1"
-"Healthcare stocks with EPS > 5 and PE ratio < 25"
+# Sector filters
+"Tech stocks with PE < 25"
+"Healthcare stocks with profit margin > 10%"
+"Finance stocks with ROE > 15%"
+"Energy stocks with upside > 20%"
 
-# Quarterly analysis
-"Stocks with increasing revenue for last 3 quarters"
-"Companies with positive profit last 4 quarters"
+# Country / ADR filters
+"Indian ADR stocks"
+"Chinese stocks with market cap > 10B"
+"US large cap stocks with dividend yield > 2%"
+
+# Quarterly analysis (quarterly data shown only for these queries)
+"Tech stocks with positive profit last 4 quarters"
+"Companies with positive net profit for last 8 quarters"
+"Healthcare stocks profitable last 4 quarters"
+
+# Combined
+"Large cap finance stocks with ROE > 15% and PE < 20"
+"Tech ADR stocks with dividend yield > 1%"
 ```
 
 ### Portfolio Management
@@ -560,45 +597,77 @@ Screenshots available in `img/` directory.
 - **🌐 Multi-Market Support**: International stock exchanges
 - **👥 Social Features**: Share portfolios and strategies
 
+## 🤖 Automated Ingestion (GitHub Actions)
+
+Data refreshes automatically via `.github/workflows/ingest.yml`:
+
+| Schedule | Runs | Purpose |
+|---|---|---|
+| Weekdays Mon–Fri, 6 AM UTC | `fundamentals` + `analyst_targets` | Refresh daily prices & metrics |
+| 2nd of every month, 3 AM UTC | All 4 scripts | Full monthly refresh |
+| Manual (Actions tab) | Any step: `all / stocks / fundamentals / quarterly / analyst` | On-demand |
+
+### Setup GitHub Secrets
+Go to **Repo → Settings → Secrets → Actions** and add:
+
+| Secret | Value |
+|---|---|
+| `TIDB_HOST` | TiDB Cloud host |
+| `TIDB_PORT` | `4000` |
+| `TIDB_USER` | TiDB username |
+| `TIDB_PASSWORD` | TiDB password |
+| `TIDB_DB` | `stock_db` |
+| `TIDB_CA_CERT` | Full contents of `.certs/isrgrootx1.pem` |
+
+> `TIDB_CA_CERT` is the **file contents** (paste the PEM text), not a path.
+
+See [INGESTION_SCHEDULE.md](INGESTION_SCHEDULE.md) for full details.
+
 ## 📁 Project Structure
 
 ```
 Stock-Screener/
+├── .github/
+│   └── workflows/
+│       └── ingest.yml           # Automated ingestion schedule
 ├── backend/
 │   ├── ai/
-│   │   ├── compiler.py          # SQL query compilation
+│   │   ├── compiler.py          # DSL → SQL compilation
 │   │   ├── engine.py            # AI processing pipeline
-│   │   ├── llm_parser.py        # Natural language parser
+│   │   ├── llm_parser.py        # Natural language → DSL parser
 │   │   ├── routes.py            # AI API endpoints
 │   │   └── validator.py         # Query validation
 │   ├── alert_checker.py         # Alert monitoring service
 │   ├── alerts.py                # Alert API endpoints
 │   ├── auth.py                  # Authentication & JWT
 │   ├── cache.py                 # Redis caching layer
-│   ├── database.py              # Database connection
+│   ├── database.py              # Database connection (local/TiDB)
 │   ├── main.py                  # FastAPI application
 │   ├── portfolio.py             # Portfolio API endpoints
 │   └── stocks.py                # Stock API endpoints
 ├── ingestion/
-│   ├── db.py                    # Database utilities
-│   ├── ingest_stocks.py         # Stock data ingestion
-│   ├── ingest_fundamentals.py  # Fundamental metrics
-│   ├── ingest_quarterly_financials.py  # Quarterly data
-│   ├── ingest_analyst_targets.py       # Analyst recommendations
-│   └── run_all.py               # Run all ingestion scripts
+│   ├── db.py                    # TiDB Cloud connection (reads .env.tidb)
+│   ├── ingest_stocks.py         # Step 1 — stock symbols & sectors
+│   ├── ingest_fundamentals.py   # Step 2 — PE, price, ROE, EPS …
+│   ├── ingest_quarterly_financials.py  # Step 3 — up to 20 quarters
+│   ├── ingest_analyst_targets.py       # Step 4 — analyst targets
+│   └── run_all.py               # Pipeline runner (supports --from N)
 ├── tests/
-│   ├── test_validator.py        # Validator tests
-│   ├── test_compiler.py         # Compiler tests
-│   └── test_api_endpoints.py    # API integration tests
+│   ├── test_validator.py
+│   ├── test_compiler.py
+│   └── test_api_endpoints.py
 ├── img/                         # Screenshots
 ├── streamlit_app.py             # Frontend application
 ├── schema.sql                   # Database schema
 ├── add_indexes.sql              # Performance indexes
 ├── requirements.txt             # Python dependencies
 ├── view_cache.py                # Redis cache viewer utility
-├── .env                         # Environment variables (gitignored)
-├── .gitignore                   # Git ignore rules
-└── README.md                    # This file
+├── INGESTION_SCHEDULE.md        # GitHub Actions setup guide
+├── .env                         # Local env (gitignored)
+├── .env.tidb                    # TiDB Cloud env (gitignored)
+├── .certs/                      # TiDB SSL cert (gitignored)
+├── .gitignore
+└── README.md
 ```
 
 ## ⚠️ Disclaimers
