@@ -80,16 +80,15 @@ def compile_and_run(dsl):
         cursor.execute(base_sql, params)
         results = cursor.fetchall()
         quarterly_data = {}
-        
-        # Always include recent quarterly figures for matching stocks so the
-        # home-page results provide useful financial context for every query.
-        if results:
+
+        # Only fetch quarterly data if the query explicitly asked for it
+        if results and has_quarterly_conditions(dsl):
             quarterly_data = get_optimized_quarterly_data(cursor, results, dsl)
         
         return {
             'stocks': results,
             'quarterly_data': quarterly_data,
-            'has_quarterly': bool(quarterly_data)
+            'has_quarterly': bool(quarterly_data) and has_quarterly_conditions(dsl)
         }
         
     except mysql.connector.Error as e:
