@@ -38,24 +38,28 @@ jobs:
 
       # ── 4. Write .env.tidb from GitHub Secrets ───────────────────────────────
       - name: Create .env.tidb
-        working-directory: .          # write to repo root
+        working-directory: .
         run: |
-          cat > .env.tidb << EOF
-          DB_TARGET=tidb
-          TIDB_HOST=${{ secrets.TIDB_HOST }}
-          TIDB_PORT=${{ secrets.TIDB_PORT }}
-          TIDB_USER=${{ secrets.TIDB_USER }}
-          TIDB_PASSWORD=${{ secrets.TIDB_PASSWORD }}
-          TIDB_DB=${{ secrets.TIDB_DB }}
-          TIDB_CA=${{ secrets.TIDB_CA }}
-          EOF
+          {
+            echo "DB_TARGET=tidb"
+            echo "TIDB_HOST=${{ secrets.TIDB_HOST }}"
+            echo "TIDB_PORT=${{ secrets.TIDB_PORT }}"
+            echo "TIDB_USER=${{ secrets.TIDB_USER }}"
+            echo "TIDB_PASSWORD=${{ secrets.TIDB_PASSWORD }}"
+            echo "TIDB_DB=${{ secrets.TIDB_DB }}"
+            echo "TIDB_CA=.certs/isrgrootx1.pem"
+          } > .env.tidb
+          echo "✅ .env.tidb written"
 
       # ── 5. Write TiDB CA certificate ────────────────────────────────────────
       - name: Write TiDB CA certificate
         working-directory: .
+        env:
+          TIDB_CA_CERT: ${{ secrets.TIDB_CA_CERT }}
         run: |
           mkdir -p .certs
-          echo "${{ secrets.TIDB_CA_CERT }}" > .certs/isrgrootx1.pem
+          printf '%s' "$TIDB_CA_CERT" > .certs/isrgrootx1.pem
+          echo "✅ CA cert written ($(wc -c < .certs/isrgrootx1.pem) bytes)"
 
       # ── 6. Determine which steps to run ─────────────────────────────────────
       #    On the 2nd of each month  → run everything (stocks + all)
