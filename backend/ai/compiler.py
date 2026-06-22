@@ -1,6 +1,43 @@
 from backend.database import get_db
 import mysql.connector
 
+# Sector → list of symbols known in the DB.
+# The LLM emits  {"field": "sector", "operator": "=", "value": "Technology"}
+# and the compiler translates that to  s.sector = 'Technology'  OR
+# to a symbol IN-list when the sector name needs normalisation.
+SECTOR_ALIASES = {
+    "technology":    "Technology",
+    "tech":          "Technology",
+    "software":      "Technology",
+    "finance":       "Financial Services",
+    "financial":     "Financial Services",
+    "financials":    "Financial Services",
+    "banking":       "Financial Services",
+    "bank":          "Financial Services",
+    "healthcare":    "Healthcare",
+    "health":        "Healthcare",
+    "pharma":        "Healthcare",
+    "pharmaceutical":"Healthcare",
+    "consumer":      "Consumer Cyclical",
+    "retail":        "Consumer Cyclical",
+    "discretionary": "Consumer Cyclical",
+    "staples":       "Consumer Defensive",
+    "consumer staples": "Consumer Defensive",
+    "energy":        "Energy",
+    "oil":           "Energy",
+    "industrials":   "Industrials",
+    "industrial":    "Industrials",
+    "realestate":    "Real Estate",
+    "real estate":   "Real Estate",
+    "reit":          "Real Estate",
+    "utilities":     "Utilities",
+    "utility":       "Utilities",
+    "communication": "Communication Services",
+    "telecom":       "Communication Services",
+    "media":         "Communication Services",
+    "materials":     "Basic Materials",
+}
+
 def compile_and_run(dsl):
     """Compile and execute DSL with simplified query."""
     db = None
@@ -223,7 +260,10 @@ def build_condition_clause(cond):
     elif field == "is_adr":
         return f"s.is_adr {operator} %s", [value]
     elif field == "sector":
-        return f"s.sector {operator} %s", [value]
+        # normalise sector name via alias table
+        raw   = str(value).lower().strip()
+        canon = SECTOR_ALIASES.get(raw, value)   # keep original if no alias found
+        return "s.sector = %s", [canon]
     elif field == "industry":
         return f"s.industry {operator} %s", [value]
     
