@@ -1,0 +1,58 @@
+# ── Credentials & secrets ────────────────────────────────────────────────────
+.env
+.env.*
+.env.tidb
+.env.local
+.env.production
+
+# TiDB / SSL certificates
+.certs/
+*.pem
+*.crt
+*.key
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+stockenv/
+
+# ── Database / backups ───────────────────────────────────────────────────────
+backup.sql
+*.sql.gz
+*.db
+*.sqlite3
+
+# ── Temporary / diagnostic scripts (not needed in repo) ──────────────────────
+ingestion/check_tidb.py
+ingestion/remove_etfs.py
+check_stocks.py
+test_portfolio_endpoint.py
+create_documentation.py
+AI_Stock_Screener_Documentation.docx
+
+# ── OS / editor ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+
+# ── Misc ─────────────────────────────────────────────────────────────────────
+*.tmp
+*.bak

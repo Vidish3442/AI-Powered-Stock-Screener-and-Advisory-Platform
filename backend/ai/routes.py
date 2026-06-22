@@ -1,12 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from backend.ai.engine import run_engine
 from backend.auth import get_current_user
 from backend.cache import cache
+from backend.security import rate_limiter
 
 router = APIRouter(prefix="/ai", tags=["AI"])
+logger = logging.getLogger(__name__)
 
 @router.post("/screener")
-def screener(query: str, current_user=Depends(get_current_user)):
+def screener(
+    request: Request,
+    query: str = Query(min_length=1, max_length=500),
+    current_user=Depends(get_current_user),
+):
+    rate_limiter.check(
+        f"ai-screener:user:{current_user['user_id']}",
+        limit=20,
+        window_seconds=60,
+    )
     try:
         if not query or not query.strip():
             raise HTTPException(status_code=400, detail="Query cannot be empty")
@@ -36,4 +49,5 @@ def screener(query: str, current_user=Depends(get_current_user)):
         if "Database connection issue" in error_msg:
             raise HTTPException(status_code=503, detail="Database connection issue. Please try again.")
         else:
-            raise HTTPException(status_code=500, detail=f"Processing error: {error_msg}")
+            logger.exception("Screener processing failed")
+            raise HTTPException(status_code=500, detail="Unable to process the screener query")

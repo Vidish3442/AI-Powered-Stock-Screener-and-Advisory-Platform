@@ -1,12 +1,16 @@
 ALLOWED_FIELDS = {
-    "pe_ratio", "eps", "market_cap", "roe", "debt_equity", 
+    "pe_ratio", "eps", "market_cap", "roe", "debt_equity",
     "price_to_book", "dividend_yield", "profit_margin", "beta", "current_price",
     "market_cap_category", "country", "is_adr", "sector", "industry",
     "target_price", "recommendation", "upside"
 }
-ALLOWED_OPERATORS = {">", ">=", "<", "<=", "="}
+
+# Fields whose value is a string, not a number
+STRING_VALUE_FIELDS = {"market_cap_category", "country", "sector", "industry", "recommendation"}
+
+ALLOWED_OPERATORS     = {">", ">=", "<", "<=", "="}
 ALLOWED_QUARTERLY_CONDITIONS = {"positive", "negative"}
-ALLOWED_QUARTERLY_FIELDS = {"net_profit", "revenue"}
+ALLOWED_QUARTERLY_FIELDS     = {"net_profit", "revenue"}
 
 def validate_dsl(dsl: dict):
     """Recursively validate DSL structure and content."""
@@ -55,21 +59,36 @@ def validate_condition(cond: dict, index: int):
     """Validate a simple condition."""
     field = cond.get("field")
     if not field:
-        raise ValueError(f"Condition {index} missing 'field'")    
+        raise ValueError(f"Condition {index} missing 'field'")
+
     if field in ALLOWED_QUARTERLY_FIELDS:
         raise ValueError(f"Field '{field}' should use quarterly condition type, not regular condition")
-    
+
     if field not in ALLOWED_FIELDS:
         raise ValueError(f"Invalid field '{field}'. Allowed fields: {', '.join(sorted(ALLOWED_FIELDS))}")
-    
+
     operator = cond.get("operator")
     if operator not in ALLOWED_OPERATORS:
         raise ValueError(f"Invalid operator '{operator}'. Allowed: {', '.join(ALLOWED_OPERATORS)}")
-    
+
     value = cond.get("value")
+
+    # String-valued fields accept any non-empty string
+    if field in STRING_VALUE_FIELDS:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"Condition {index}: field '{field}' requires a non-empty string value")
+        return
+
+    # is_adr is boolean (0/1)
+    if field == "is_adr":
+        if value not in (0, 1, True, False):
+            raise ValueError(f"Condition {index}: 'is_adr' value must be 0 or 1")
+        return
+
+    # All other fields must be non-negative numbers
     if not isinstance(value, (int, float)):
         raise ValueError(f"Condition {index} value must be a number")
-    
+
     if value < 0:
         raise ValueError(f"Condition {index} value must be non-negative")
 
@@ -122,13 +141,21 @@ def validate_legacy_format(dsl: dict):
             operator = cond.get("operator")
             if operator not in ALLOWED_OPERATORS:
                 raise ValueError(f"Invalid operator '{operator}'. Allowed: {', '.join(ALLOWED_OPERATORS)}")
-            
+
             value = cond.get("value")
-            if not isinstance(value, (int, float)):
-                raise ValueError(f"Condition {i} value must be a number")
-            
-            if value < 0:
-                raise ValueError(f"Condition {i} value must be non-negative")
+
+            # String-valued fields
+            if field in STRING_VALUE_FIELDS:
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError(f"Condition {i}: field '{field}' requires a non-empty string value")
+            elif field == "is_adr":
+                if value not in (0, 1, True, False):
+                    raise ValueError(f"Condition {i}: 'is_adr' value must be 0 or 1")
+            else:
+                if not isinstance(value, (int, float)):
+                    raise ValueError(f"Condition {i} value must be a number")
+                if value < 0:
+                    raise ValueError(f"Condition {i} value must be non-negative")
         else:
             raise ValueError(f"Condition {i} must have 'operator'")
     

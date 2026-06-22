@@ -1,0 +1,110 @@
+name: Stock Data Ingestion
+
+on:
+  schedule:
+    # Fundamentals + analyst targets: every day at 6 AM UTC (market opens ~9:30 AM ET)
+    - cron: '0 6 * * 1-5'        # weekdays only (Mon–Fri)
+    # Full ingestion (stocks + quarterly) on 2nd of every month at 3 AM UTC
+    - cron: '0 3 2 * *'
+  workflow_dispatch:              # allow manual trigger from GitHub UI
+    inputs:
+      step:
+        description: 'Which step to run: all | stocks | fundamentals | quarterly | analyst'
+        required: false
+        default: 'all'
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ingestion   # all python commands run inside /ingestion
+
+    steps:
+      # ── 1. Checkout ─────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Python setup ─────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # ── 3. Install dependencies ─────────────────────────────────────────────
+      - name: Install dependencies
+        run: pip install -r ../requirements.txt
+
+      # ── 4. Write .env.tidb from GitHub Secrets ───────────────────────────────
+      - name: Create .env.tidb
+        working-directory: .          # write to repo root
+        run: |
+          cat > .env.tidb << EOF
+          DB_TARGET=tidb
+          TIDB_HOST=${{ secrets.TIDB_HOST }}
+          TIDB_PORT=${{ secrets.TIDB_PORT }}
+          TIDB_USER=${{ secrets.TIDB_USER }}
+          TIDB_PASSWORD=${{ secrets.TIDB_PASSWORD }}
+          TIDB_DB=${{ secrets.TIDB_DB }}
+          TIDB_CA=${{ secrets.TIDB_CA }}
+          EOF
+
+      # ── 5. Write TiDB CA certificate ────────────────────────────────────────
+      - name: Write TiDB CA certificate
+        working-directory: .
+        run: |
+          mkdir -p .certs
+          echo "${{ secrets.TIDB_CA_CERT }}" > .certs/isrgrootx1.pem
+
+      # ── 6. Determine which steps to run ─────────────────────────────────────
+      #    On the 2nd of each month  → run everything (stocks + all)
+      #    On weekdays               → run only fundamentals + analyst (fast)
+      #    Manual dispatch           → respect the 'step' input
+
+      - name: Run stock ingestion (monthly or manual:all/stocks)
+        if: |
+          github.event_name == 'workflow_dispatch' && (
+            github.event.inputs.step == 'all' ||
+            github.event.inputs.step == 'stocks'
+          ) ||
+          (github.event_name == 'schedule' && contains(github.event.schedule, '0 3 2'))
+        run: python ingest_stocks.py
+
+      - name: Run fundamentals ingestion
+        if: |
+          github.event_name == 'workflow_dispatch' && (
+            github.event.inputs.step == 'all' ||
+            github.event.inputs.step == 'fundamentals'
+          ) ||
+          github.event_name == 'schedule'
+        run: python ingest_fundamentals.py
+
+      - name: Run quarterly financials ingestion (monthly or manual:all/quarterly)
+        if: |
+          github.event_name == 'workflow_dispatch' && (
+            github.event.inputs.step == 'all' ||
+            github.event.inputs.step == 'quarterly'
+          ) ||
+          (github.event_name == 'schedule' && contains(github.event.schedule, '0 3 2'))
+        run: python ingest_quarterly_financials.py
+
+      - name: Run analyst targets ingestion
+        if: |
+          github.event_name == 'workflow_dispatch' && (
+            github.event.inputs.step == 'all' ||
+            github.event.inputs.step == 'analyst'
+          ) ||
+          github.event_name == 'schedule'
+        run: python ingest_analyst_targets.py
+
+      # ── 7. Verify data was written ───────────────────────────────────────────
+      - name: Verify TiDB Cloud row counts
+        run: python check_tidb.py
+
+      # ── 8. Notify on failure ─────────────────────────────────────────────────
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "❌ Ingestion failed. Check the logs above."
+          echo "Run manually: cd ingestion && python run_all.py"
