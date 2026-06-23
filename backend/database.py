@@ -6,10 +6,9 @@ from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-# Keep local credentials in .env and optional TiDB credentials in .env.tidb.
-# Environment variables supplied by a deployment platform take precedence.
+# Only load .env for the backend — never .env.tidb (that is ingestion-only).
+# .env.tidb is intentionally excluded so the backend always uses local/configured DB.
 load_dotenv(PROJECT_ROOT / ".env")
-load_dotenv(PROJECT_ROOT / ".env.tidb")
 
 
 def _database_config():

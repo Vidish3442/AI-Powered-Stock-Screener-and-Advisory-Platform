@@ -50,7 +50,7 @@ def health_check():
     return {
         "status": "healthy",
         "cache_enabled": cache.is_available(),
-        "cache_type": "redis" if cache.is_available() else "none"
+        "cache_type": "upstash" if cache.is_available() else "none"
     }
 
 @app.post("/cache/clear", dependencies=[Depends(require_cache_admin)])
@@ -64,16 +64,4 @@ def clear_cache():
 @app.get("/cache/stats", dependencies=[Depends(require_cache_admin)])
 def cache_stats():
     """Get cache statistics."""
-    if cache.is_available():
-        try:
-            info = cache.client.info()
-            return {
-                "enabled": True,
-                "connected_clients": info.get("connected_clients", 0),
-                "used_memory_human": info.get("used_memory_human", "N/A"),
-                "total_keys": cache.client.dbsize(),
-                "uptime_days": info.get("uptime_in_days", 0)
-            }
-        except Exception:
-            return {"enabled": False, "error": "Cannot retrieve stats"}
-    return {"enabled": False, "message": "Cache not available"}
+    return cache.get_stats()

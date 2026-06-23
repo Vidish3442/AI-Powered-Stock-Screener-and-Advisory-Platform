@@ -14,6 +14,10 @@ if 'user_email' not in st.session_state:
     st.session_state.user_email = None
 if 'user_name' not in st.session_state:
     st.session_state.user_name = None
+if 'screener_result' not in st.session_state:
+    st.session_state.screener_result = None
+if 'screener_success' not in st.session_state:
+    st.session_state.screener_success = None
 
 def login_user(email, password):
     """Login user and get token."""
@@ -265,10 +269,21 @@ else:
         )
         
         if st.button("Run Screener") and query:
-            with st.spinner("Running screener..."):
+            # Clear previous results immediately before running
+            st.session_state.screener_result = None
+            st.session_state.screener_success = None
+
+            with st.spinner("🔍 Running screener..."):
                 success, result = run_screener(query)
-                
-                if success:
+                st.session_state.screener_result = result
+                st.session_state.screener_success = success
+
+        # Display results (from session state so they persist correctly)
+        success = st.session_state.get("screener_success")
+        result  = st.session_state.get("screener_result")
+
+        if success is not None:
+            if success:
                     result_count = len(result['results'])
                     st.success(f"Found {result_count} stocks matching your criteria")
                     
@@ -443,14 +458,13 @@ else:
                     
                     else:
                         st.info("No stocks matched your criteria")
-                else:
-                    error_msg = result
-                    st.error(f"❌ {error_msg}")                
-                    if "data we don't have" in error_msg.lower() or "unsupported" in error_msg.lower():
-                        st.info("💡 Try: `PE ratio > 15` or `positive profit last 4 quarters`")
-                    
-                    if "Session expired" in result:
-                        st.rerun()
+            else:
+                error_msg = result
+                st.error(f"❌ {error_msg}")
+                if "data we don't have" in error_msg.lower() or "unsupported" in error_msg.lower():
+                    st.info("💡 Try: `PE ratio > 15` or `tech stocks with positive profit last 4 quarters`")
+                if "Session expired" in str(result):
+                    st.rerun()
     
     with tab2:
         st.warning("💼 **Portfolio Disclaimer:** Portfolio tracking is for educational and informational purposes only. The values shown are based on current market data and may not reflect actual trading prices. This tool does not provide investment advice or recommendations.")
