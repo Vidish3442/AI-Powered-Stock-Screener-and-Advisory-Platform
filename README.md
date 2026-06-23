@@ -26,6 +26,11 @@ AI Stock Screener is a comprehensive stock analysis platform that combines the p
 - **GitHub Actions**: Automated scheduled ingestion (daily + monthly)
 - **Python Scripts**: Modular ingestion pipeline
 
+### Caching
+- **Upstash Redis** (Singapore ap-southeast-1): Cloud Redis with TLS — same region as TiDB for minimal latency
+- **REDIS_URL**: Standard `rediss://` URL — works with any Redis-compatible server
+- **Graceful fallback**: App runs normally if cache is unavailable
+
 ## ⚙️ Core Features
 
 ### 1. AI-Powered Stock Screening
@@ -58,12 +63,12 @@ AI Stock Screener is a comprehensive stock analysis platform that combines the p
 - **Manual Refresh**: On-demand alert checking with one click
 - **Smart Deduplication**: Shows only most recent trigger per alert
 
-### 4. Redis Caching System
-- **Graceful Fallback**: Works seamlessly with or without Redis
-- **Repeated-Query Performance**: Avoids rerunning identical screener queries during the cache window
-- **Cache TTL**: Screener responses use a 10-minute cache
-- **Cache Management**: Health checks, statistics, and manual clearing
-- **Monitoring Tools**: Built-in cache viewer utility
+### 4. Redis Caching System (Upstash)
+- **Cloud Redis**: Upstash Redis in Singapore — same region as TiDB for lowest latency
+- **Graceful Fallback**: Works seamlessly without cache if `REDIS_URL` is not set
+- **Cache impact**: First query hits TiDB (~1-2s); same query again served in ~50ms (20-40x faster)
+- **Screener TTL**: 10 minutes per query
+- **Cache Management**: `/health`, `/cache/stats`, `/cache/clear` endpoints
 
 ## 🚧 Problems Solved
 
